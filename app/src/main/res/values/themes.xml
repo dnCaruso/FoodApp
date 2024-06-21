@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.FoodAppSplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/custom_red</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.FoodApp</item>
+    </style>
+    <style name="Theme.FoodApp" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
