@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
                 android.graphics.Color.TRANSPARENT,
             )
         )
+
         super.onCreate(savedInstanceState)
         setContent {
             FoodAppTheme {
@@ -38,4 +39,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

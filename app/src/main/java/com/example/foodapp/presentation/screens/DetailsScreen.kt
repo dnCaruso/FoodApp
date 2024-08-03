@@ -1,5 +1,6 @@
 package com.example.foodapp.presentation.view
 
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -31,30 +32,36 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.foodapp.R
+import com.example.foodapp.model.Recipe
 import com.example.foodapp.presentation.navigation.Screen
 import com.example.foodapp.presentation.theme.FoodAppTypography
 import com.example.foodapp.presentation.theme.RecipeTitleRed
 import com.example.foodapp.presentation.theme.ScreensLightRed
 import com.example.foodapp.presentation.theme.ScreensRed
 import com.example.foodapp.presentation.theme.SectionTitleRed
+import com.example.foodapp.presentation.viewmodel.FavoritesViewModel
+import com.example.foodapp.presentation.viewmodel.MainViewModel
 import com.example.foodapp.util.UiConstants
 
 @Composable
 fun DetailsScreen(
-    recipeTitle: String,
-    imageUrl: String,
-    strInstructions: String,
-    ingredients: List<String>,
-    measures: List<String>,
+    recipe: Recipe,
+    viewModel: MainViewModel,
+    favoriteViewModel: FavoritesViewModel,
     navController: NavHostController
 ) {
+    viewModel.fetchMealDetails(recipe.idMeal)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -68,23 +75,26 @@ fun DetailsScreen(
     ) {
         item {
             detailsScreenHeader(
-                recipeTitle = recipeTitle,
-                imageUrl = imageUrl,
-                onClick = { navController.navigate(Screen.Home.route) })
+                recipe = recipe,
+                onClickReturn = { navController.navigate(Screen.Home.route) },
+                viewModel = favoriteViewModel
+            )
         }
 
         item {
             detailsScreenBody(
-                ingredients = ingredients,
-                measures = measures,
-                strInstructions = strInstructions
+                ingredients = viewModel.getIngredients(),
+                measures = viewModel.getMeasures(),
+                strInstructions = viewModel.getInstructions()
             )
         }
     }
 }
 
 @Composable
-fun detailsScreenHeader(recipeTitle: String, imageUrl: String, onClick: () -> Unit) {
+fun detailsScreenHeader(recipe: Recipe, onClickReturn: () -> Unit, viewModel: FavoritesViewModel) {
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .wrapContentSize()
@@ -101,8 +111,8 @@ fun detailsScreenHeader(recipeTitle: String, imageUrl: String, onClick: () -> Un
             modifier = Modifier
                 .fillMaxWidth()
                 .height(300.dp),
-            painter = rememberAsyncImagePainter(model = imageUrl),
-            contentDescription = "",
+            painter = rememberAsyncImagePainter(model = recipe.strMealThumb),
+            contentDescription = null,
             contentScale = ContentScale.Crop
         )
 
@@ -112,7 +122,7 @@ fun detailsScreenHeader(recipeTitle: String, imageUrl: String, onClick: () -> Un
                 .padding(
                     top = UiConstants.FLOATING_BUTTON_TOP_PADDING,
                     start = UiConstants.FLOATING_BUTTON_HORIZONTAL_PADDING,
-                    end=  UiConstants.FLOATING_BUTTON_HORIZONTAL_PADDING
+                    end = UiConstants.FLOATING_BUTTON_HORIZONTAL_PADDING
                 )
                 .align(Alignment.TopStart)
         ) {
@@ -122,11 +132,11 @@ fun detailsScreenHeader(recipeTitle: String, imageUrl: String, onClick: () -> Un
                     .align(Alignment.TopStart)
                     .shadow(elevation = 8.dp, shape = CircleShape),
                 colors = IconButtonDefaults.iconButtonColors(Color.White),
-                onClick = onClick
+                onClick = onClickReturn
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.arrowback),
-                    contentDescription = ""
+                    contentDescription = null
                 )
             }
 
@@ -137,10 +147,23 @@ fun detailsScreenHeader(recipeTitle: String, imageUrl: String, onClick: () -> Un
                     .shadow(elevation = 8.dp, shape = CircleShape)
                     .padding(),
                 colors = IconButtonDefaults.iconButtonColors(Color.White),
-                onClick = { /*TODO*/ }) {
+                onClick = {
+                    if (viewModel.addFavorite(recipe)) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_added), Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_not_added), Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            ) {
                 Image(
                     painter = painterResource(id = R.drawable.favoriteicon),
-                    contentDescription = ""
+                    contentDescription = null
                 )
             }
         }
@@ -176,13 +199,21 @@ fun detailsScreenHeader(recipeTitle: String, imageUrl: String, onClick: () -> Un
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = recipeTitle, style = FoodAppTypography.titleLarge, textAlign = TextAlign.Center)
+        Text(
+            text = recipe.strMeal,
+            style = FoodAppTypography.titleLarge,
+            textAlign = TextAlign.Center
+        )
     }
     Spacer(modifier = Modifier.height(16.dp))
 }
 
 @Composable
-fun detailsScreenBody(ingredients: List<String>, measures: List<String>, strInstructions: String) {
+fun detailsScreenBody(
+    ingredients: List<String?>?,
+    measures: List<String?>?,
+    strInstructions: String
+) {
     Box() {
         Row(
             modifier = Modifier
@@ -197,14 +228,14 @@ fun detailsScreenBody(ingredients: List<String>, measures: List<String>, strInst
             Spacer(modifier = Modifier.width(5.dp))
             Text(
                 modifier = Modifier.padding(),
-                text = "Ingredients",
+                text = stringResource(R.string.label_ingredients),
                 style = FoodAppTypography.titleMedium
             )
         }
         Image(
             modifier = Modifier.size(46.dp),
             painter = painterResource(id = R.drawable.ingredientsicon),
-            contentDescription = ""
+            contentDescription = null
         )
     }
 
@@ -229,7 +260,7 @@ fun detailsScreenBody(ingredients: List<String>, measures: List<String>, strInst
             Spacer(modifier = Modifier.width(5.dp))
             Text(
                 modifier = Modifier.padding(),
-                text = "Instructions",
+                text = stringResource(R.string.label_instructions),
                 style = FoodAppTypography.titleMedium
             )
         }
@@ -238,49 +269,49 @@ fun detailsScreenBody(ingredients: List<String>, measures: List<String>, strInst
                 .size(50.dp)
                 .offset(-10.dp),
             painter = painterResource(id = R.drawable.instructionsicon),
-            contentDescription = ""
+            contentDescription = null
         )
     }
-    Text(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+    Text(
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
         text = strInstructions,
         style = FoodAppTypography.bodySmall,
-        textAlign = TextAlign.Start)
+        textAlign = TextAlign.Start
+    )
 }
 
 @Composable
 private fun showIngredientsSection(
-    ingredients: List<String>,
-    measures: List<String>
+    ingredients: List<String?>?,
+    measures: List<String?>?
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        val filteredIngredients = ingredients.filter { it.isNotBlank() }
-        val filteredMeasures = measures.filterIndexed { index, _ -> ingredients[index].isNotBlank() }
 
-        filteredIngredients.forEachIndexed { index, ingredient ->
-            ingredientItem(ingredient = ingredient, filteredMeasures.getOrNull(index) ?: "")
+        ingredients?.forEachIndexed { index, ingredient ->
+            ingredientItem(ingredient = ingredient, measures?.getOrNull(index) ?: "")
         }
     }
 }
 
 @Composable
-private fun ingredientItem(ingredient: String, measure: String) {
+private fun ingredientItem(ingredient: String?, measure: String?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(4.dp), verticalAlignment = Alignment.CenterVertically
     ) {
-            Canvas(modifier = Modifier.size(10.dp)) {
-                drawCircle(color = ScreensRed)
-            }
+        Canvas(modifier = Modifier.size(10.dp)) {
+            drawCircle(color = ScreensRed)
+        }
         Text(
             modifier = Modifier.padding(start = 8.dp),
-            text = ingredient + " ",
+            text = stringResource(R.string.ingredient, ingredient!!),
             style = FoodAppTypography.bodySmall,
             textAlign = TextAlign.Start
         )
         Text(
             modifier = Modifier.padding(start = 8.dp),
-            text = measure,
+            text = measure!!,
             style = FoodAppTypography.bodySmall,
             textAlign = TextAlign.Start
         )

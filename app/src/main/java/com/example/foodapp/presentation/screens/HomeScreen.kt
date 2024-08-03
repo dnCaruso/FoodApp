@@ -44,6 +44,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.sp
 import com.example.foodapp.model.Area
@@ -51,35 +52,52 @@ import com.example.foodapp.presentation.theme.PlaceHolderColor
 import com.example.foodapp.presentation.theme.PlaceHolderStrokeColor
 import com.example.foodapp.presentation.viewmodel.MainViewModel
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.navigation.NavHostController
 import coil.compose.rememberAsyncImagePainter
 import com.example.foodapp.model.Recipe
 import com.example.foodapp.presentation.navigation.BottomNavBar
 import com.example.foodapp.presentation.navigation.Screen
+import com.example.foodapp.presentation.navigation.items
 import com.example.foodapp.presentation.theme.ScreensLightRed
+import com.google.gson.Gson
+import kotlinx.coroutines.delay
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
 
-    Scaffold(bottomBar = { BottomNavBar()}) {
+    Scaffold(bottomBar = { BottomNavBar(navController, viewModel = viewModel) }) {
         val areas = viewModel.areas.value
         val recipes = viewModel.recipesByArea
-        val recipeDetails = viewModel.recipeDetails.value
+        val searchQuery by viewModel.searchQuery.collectAsState()
+        val filteredRecipes by viewModel.filteredRecipes.collectAsState()
 
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .background(HomeScreenDarkRed)
-                .padding(8.dp)
+                .padding(8.dp, bottom = 80.dp)
         ) {
+
             item {
-                HomeScreenHeader()
+                HomeScreenHeader(
+                    searchQuery = searchQuery,
+                    allRecipes = filteredRecipes,
+                    viewModel = viewModel
+                )
+            }
+
+            if(filteredRecipes.isNotEmpty()) {
+                items(filteredRecipes) { recipe ->
+                    SearchOption(recipe = recipe, navController = navController)
+                }
             }
 
             itemsIndexed(areas) { index, area ->
-
                 LaunchedEffect(key1 = area.strArea) {
                     viewModel.fetchRecipesByArea(area.strArea)
                 }
@@ -89,14 +107,10 @@ fun HomeScreen(viewModel: MainViewModel, navController: NavHostController) {
             }
         }
     }
-
-
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreenHeader() {
+fun HomeScreenHeader(searchQuery: String, allRecipes: List<Recipe>, viewModel: MainViewModel) {
     Box(
         modifier = Modifier
             .wrapContentSize()
@@ -119,11 +133,44 @@ fun HomeScreenHeader() {
             contentScale = ContentScale.Crop
         )
 
+        Image(
+            modifier = Modifier
+                .size(140.dp)
+                .offset(x = 7.dp),
+            painter = painterResource(id = R.drawable.foodapplogo),
+            alpha = 100f,
+            contentDescription = "FoodApp Logo"
+        )
+
+        Text(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = (-34).dp),
+            text = stringResource(R.string.label_home_screen_header),
+            style = FoodAppTypography.titleSmall,
+            color = Color.White
+        )
+
+        // Gradient effect
+        Spacer(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(55.dp) // Adjust height as needed
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            HomeScreenDarkRed
+                        )
+                    )
+                )
+                .align(Alignment.BottomCenter)
+        )
         Box(
             modifier = Modifier
-                .height(80.dp)
                 .align(Alignment.TopCenter)
                 .padding(24.dp)
+                .clickable { viewModel.getAllRecipes() }
         ) {
             OutlinedTextField(
                 placeholder = {
@@ -134,8 +181,9 @@ fun HomeScreenHeader() {
                     )
                 },
 
-                value = "",
+                value = searchQuery,
                 onValueChange = {
+                    viewModel.updateSearchQuery(it)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -157,41 +205,28 @@ fun HomeScreenHeader() {
                 colors = OutlinedTextFieldDefaults.colors(Color.White)
             )
         }
-
-        Image(
-            modifier = Modifier
-                .size(140.dp)
-                .offset(x = 7.dp),
-            painter = painterResource(id = R.drawable.foodapplogo),
-            alpha = 100f,
-            contentDescription = "FoodApp Logo"
-        )
-
-        Text(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = (-34).dp),
-            text = "Explore culinary delights from around the globe!",
-            style = FoodAppTypography.titleSmall,
-            color = Color.White
-        )
-
-        // Gradient effect
-        Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(55.dp) // Adjust height as needed
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            HomeScreenDarkRed
-                        )
-                    )
-                )
-                .align(Alignment.BottomCenter)
-        )
     }
+}
+
+@Composable
+fun SearchOption(
+    recipe: Recipe,
+    navController: NavHostController
+) {
+    Text(
+        text = recipe.strMeal ?: "No Title",
+        fontSize = 12.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+            .background(Color.Gray.copy(alpha = 0.2f))
+            .padding(8.dp)
+            .clickable {
+                val movieJson = Gson().toJson(recipe)
+                val encodedMovieJson = URLEncoder.encode(movieJson, StandardCharsets.UTF_8.toString())
+                navController.navigate(Screen.Details.createRoute(encodedMovieJson))
+            }
+    )
 }
 
 @Composable
@@ -201,7 +236,11 @@ fun HomeScreenBody(category: String, recipes: List<Recipe>, navController: NavHo
             .fillMaxSize()
             .padding()
     ) {
-        Text(modifier = Modifier.padding(8.dp), text = category, style = FoodAppTypography.labelLarge)
+        Text(
+            modifier = Modifier.padding(8.dp),
+            text = category,
+            style = FoodAppTypography.labelLarge
+        )
 
         LazyRow(
             modifier = Modifier
@@ -209,10 +248,15 @@ fun HomeScreenBody(category: String, recipes: List<Recipe>, navController: NavHo
                 .padding()
         ) {
             items(recipes) { recipe ->
+
+                val recipeJson = Gson().toJson(recipe)
+                val encodedRecipeJson =
+                    URLEncoder.encode(recipeJson, StandardCharsets.UTF_8.toString())
+
                 RecipeCard(
                     recipe = recipe,
                     onClick = {
-                        navController.navigate(Screen.Details.createRoute(recipe.idMeal))
+                        navController.navigate(Screen.Details.createRoute(encodedRecipeJson))
                     }
                 )
             }
